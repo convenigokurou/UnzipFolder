@@ -62,8 +62,31 @@ namespace UnzipFolder
 						{
 							Invoke( new Action<string, int, int>(UpdateFile),  ent.Key, j, zip.Entries.Count());
 
-							ent.WriteToDirectory(OutputPath, options);
-							
+							if(ent.IsDirectory)
+							{
+								if(!Directory.Exists(OutputPath + Path.DirectorySeparatorChar + ent.Key))
+								{
+									ent.WriteToDirectory(OutputPath, options);
+								}
+
+								try
+								{
+									//ディレクトリがあるときに日付を変更しようとすると例外が出る とりあえず握りつぶす
+									Directory.SetLastWriteTime(Path.GetFullPath(OutputPath + Path.DirectorySeparatorChar + ent.Key), ent.LastModifiedTime.Value);
+								}
+								catch( IOException ioe)
+								{
+
+								}
+							}
+							else
+							{
+								//出力
+								ent.WriteToDirectory(OutputPath, options);
+
+								File.SetLastWriteTime(OutputPath + Path.DirectorySeparatorChar + ent.Key, ent.LastModifiedTime.Value);
+							}
+
 							j++;
 						}
 					}
