@@ -15,13 +15,16 @@ namespace UnzipFolder
 		public string OutputPath { get; set; }
 		public bool IsEndDelete { get; set; }
 
+		private Task t;
+		private bool endFlag;
+
 		private void UpdateExtFile( string file, int index, int all )
 		{
 			lblExtFile.Text = $"({index+1}/{all}){file}";
 			
 			pbExtFile.Minimum = 0;
-			pbExtFile.Maximum = all - 1;
-			pbExtFile.Value = index;
+			pbExtFile.Maximum = all;
+			pbExtFile.Value = index+1;
 		}
 
 		private void UpdateFile( string file, int index, int all )
@@ -29,77 +32,139 @@ namespace UnzipFolder
 			lblFile.Text = $"({index+1}/{all}){file}";
 			
 			pbFile.Minimum = 0;
-			pbFile.Maximum = all - 1;
-			pbFile.Value = index;
+			pbFile.Maximum = all;
+			pbFile.Value = index+1;
+		}
+		private void SendLog( string log )
+		{
+			tbLog.AppendText(log);
 		}
 
 		public ExtractForm()
 		{
 			InitializeComponent();
+
+			FormClosing += ExtractForm_FormClosing;
+		}
+
+		private void ExtractForm_FormClosing(object sender, FormClosingEventArgs e)
+		{
+			//稼働中であれば止めるようにする
+			if (endFlag == false)
+			{
+				e.Cancel = true;
+				endFlag = true;
+			}
+
+			//スレッド終わったか確認
+			if( t.IsCompleted == false )
+			{
+				e.Cancel = true;
+			}
 		}
 
 		private void ExtractForm_Load(object sender, EventArgs e)
 		{
-			Task t = Task.Run( () => 
-			{ 
-				List<string> fileList = new List<string>();
-				fileList.AddRange( Directory.EnumerateFiles( InputPath, "*.zip", SearchOption.AllDirectories ).ToList() );
-				fileList.AddRange( Directory.EnumerateFiles( InputPath, "*.rar", SearchOption.AllDirectories ).ToList() );
-
-				int i = 0;
-				foreach( string f in fileList)
+			endFlag = false;
+			t = Task.Run( () => 
+			{
+				try
 				{
-					Invoke( new Action<string, int, int>(UpdateExtFile),  f, i, fileList.Count);
+					List<string> fileList = new List<string>();
+					fileList.AddRange(Directory.EnumerateFiles(InputPath, "*.zip", SearchOption.AllDirectories).ToList());
+					fileList.AddRange(Directory.EnumerateFiles(InputPath, "*.rar", SearchOption.AllDirectories).ToList());
 
-                    using (var zip = ArchiveFactory.Open(f))
-                    {
-						var options = new ExtractionOptions();
-						options.ExtractFullPath = true;
-						options.Overwrite = true;
+					int i = 0;
+					foreach (string f in fileList)
+					{
+						Invoke(new Action<string, int, int>(UpdateExtFile), f, i, fileList.Count);
 
-						int j = 0;
-						foreach(var ent in zip.Entries)
+						try
 						{
-							Invoke( new Action<string, int, int>(UpdateFile),  ent.Key, j, zip.Entries.Count());
-
-							if(ent.IsDirectory)
+							using (var zip = ArchiveFactory.Open(f))
 							{
-								if(!Directory.Exists(OutputPath + Path.DirectorySeparatorChar + ent.Key))
-								{
-									ent.WriteToDirectory(OutputPath, options);
-								}
+								var options = new ExtractionOptions();
+								options.ExtractFullPath = true;
+								options.Overwrite = true;
 
-								try
+								int j = 0;
+								foreach (var ent in zip.Entries)
 								{
-									//ディレクトリがあるときに日付を変更しようとすると例外が出る とりあえず握りつぶす
-									Directory.SetLastWriteTime(Path.GetFullPath(OutputPath + Path.DirectorySeparatorChar + ent.Key), ent.LastModifiedTime.Value);
-								}
-								catch( IOException ioe)
-								{
+									Invoke(new Action<string, int, int>(UpdateFile), ent.Key, j, zip.Entries.Count());
 
+									if (ent.IsDirectory)
+									{
+										if (!Directory.Exists(OutputPath + Path.DirectorySeparatorChar + ent.Key))
+										{
+											ent.WriteToDirectory(OutputPath, options);
+										}
+
+										try
+										{
+											//ディレクトリがあるときに日付を変更しようとすると例外が出る とりあえず握りつぶす
+											Directory.SetLastWriteTime(Path.GetFullPath(OutputPath + Path.DirectorySeparatorChar + ent.Key), ent.LastModifiedTime.Value);
+										}
+										catch
+										{
+											//日付更新
+											Invoke(new Action<string>(SendLog), $"注意:{f}\r\n 内容:日付更新失敗(ファイル)\r\n");
+										}
+									}
+									else
+									{
+										//出力
+										ent.WriteToDirectory(OutputPath, options);
+
+										try
+										{
+											//ディレクトリがあるときに日付を変更しようとすると例外が出る とりあえず握りつぶす
+											Directory.SetLastWriteTime(Path.GetFullPath(OutputPath + Path.DirectorySeparatorChar + ent.Key), ent.LastModifiedTime.Value);
+										}
+										catch
+										{
+											//日付更新
+											Invoke(new Action<string>(SendLog), $"注意:{f}\r\n 内容:日付更新失敗(フォルダ)\r\n");
+										}
+									}
+
+									j++;
+
+									if (endFlag)
+									{
+										break;
+									}
 								}
 							}
-							else
-							{
-								//出力
-								ent.WriteToDirectory(OutputPath, options);
 
-								File.SetLastWriteTime(OutputPath + Path.DirectorySeparatorChar + ent.Key, ent.LastModifiedTime.Value);
+							if (IsEndDelete)
+							{
+								if (!endFlag)
+								{
+									File.Delete(f);
+								}
 							}
 
-							j++;
+						}
+						catch (Exception ex)
+						{
+							Invoke(new Action<string>(SendLog), $"エラー:{f}\r\n 例外:{ex.Message.Replace("\n", "\r\n")}\r\n" );
+						}
+						
+						i++;
+
+						if ( endFlag )
+						{
+							break;
 						}
 					}
-
-					if( IsEndDelete )
-					{
-						File.Delete(f);
-					}
-
-					i++;
+				}
+				catch(Exception ex)
+				{
+					Invoke(new Action<string>(SendLog), $"エラー:{ex.Message.Replace("\n", "\r\n")}\r\n");
 				}
 
-				Invoke( new Action(Close) );
+				endFlag = true;
+				Invoke(new Action<string>(SendLog), $"処理終了\r\n");
 			});
 		}
 	}

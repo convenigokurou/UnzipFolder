@@ -32,6 +32,7 @@
 			this.lblFile = new System.Windows.Forms.Label();
 			this.pbExtFile = new System.Windows.Forms.ProgressBar();
 			this.pbFile = new System.Windows.Forms.ProgressBar();
+			this.tbLog = new System.Windows.Forms.TextBox();
 			this.SuspendLayout();
 			// 
 			// lblExtFile
@@ -66,11 +67,21 @@
 			this.pbFile.Size = new System.Drawing.Size(616, 23);
 			this.pbFile.TabIndex = 3;
 			// 
+			// tbLog
+			// 
+			this.tbLog.Location = new System.Drawing.Point(14, 94);
+			this.tbLog.Multiline = true;
+			this.tbLog.Name = "tbLog";
+			this.tbLog.ReadOnly = true;
+			this.tbLog.Size = new System.Drawing.Size(614, 109);
+			this.tbLog.TabIndex = 4;
+			// 
 			// ExtractForm
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.ClientSize = new System.Drawing.Size(650, 105);
+			this.ClientSize = new System.Drawing.Size(650, 215);
+			this.Controls.Add(this.tbLog);
 			this.Controls.Add(this.pbFile);
 			this.Controls.Add(this.pbExtFile);
 			this.Controls.Add(this.lblFile);
@@ -90,5 +101,6 @@
 		private System.Windows.Forms.Label lblFile;
 		private System.Windows.Forms.ProgressBar pbExtFile;
 		private System.Windows.Forms.ProgressBar pbFile;
+		private System.Windows.Forms.TextBox tbLog;
 	}
 }
